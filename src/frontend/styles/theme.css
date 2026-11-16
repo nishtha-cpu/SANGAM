@@ -1,0 +1,14 @@
+/**
+ * SANGAM — Frontend Theme & Design Tokens
+ * Reusable utility variables and design system tokens.
+ */
+
+:root {
+  --sangam-bg: #06111f;
+  --sangam-card-bg: rgba(10, 23, 38, 0.9);
+  --sangam-accent: #34d399;
+  --sangam-accent-glow: rgba(52, 211, 153, 0.12);
+  --sangam-border: rgba(255, 255, 255, 0.08);
+  --sangam-text-main: #f8fafc;
+  --sangam-text-muted: #94a3b8;
+}

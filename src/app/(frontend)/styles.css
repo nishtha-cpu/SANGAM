@@ -1,0 +1,152 @@
+@import 'tailwindcss';
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: #06111f;
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  button,
+  a,
+  input,
+  select {
+    outline-offset: 3px;
+  }
+
+  button,
+  a {
+    transition:
+      color 0.2s ease,
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.2s ease;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-white/[.08] bg-[#0a1726]/90 shadow-[0_18px_60px_rgba(0,0,0,.12)] transition duration-300 hover:border-white/[.16] hover:bg-[#0c1b2d];
+  }
+
+  .button-primary {
+    @apply inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-[#05131d] shadow-[0_8px_30px_rgba(52,211,153,.12)] hover:-translate-y-0.5 hover:bg-emerald-200;
+  }
+
+  .button-secondary {
+    @apply inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/[.12] bg-white/[.025] px-5 py-3 text-sm font-medium text-slate-200 hover:border-white/25 hover:bg-white/[.055];
+  }
+
+  .icon-button {
+    @apply grid size-10 place-items-center rounded-xl border border-transparent text-slate-400 hover:border-white/10 hover:bg-white/[.04] hover:text-white;
+  }
+
+  .input {
+    @apply min-h-12 w-full rounded-xl border border-white/[.1] bg-white/[.035] px-4 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/10;
+  }
+
+  .input-error {
+    @apply border-rose-400/50 focus:border-rose-400 focus:ring-rose-400/10;
+  }
+
+  .field {
+    @apply block text-xs font-medium text-slate-400;
+  }
+
+  .field .input,
+  .field > div {
+    @apply mt-2;
+  }
+
+  .field small {
+    @apply mt-1.5 block min-h-3 text-[11px] text-rose-300;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[.18em] text-emerald-300;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full border border-white/10 bg-white/[.035] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400;
+  }
+
+  .tool-button {
+    @apply grid size-7 place-items-center rounded text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+  }
+
+  .severity {
+    @apply inline-flex shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider;
+  }
+
+  .severity-0 {
+    @apply border-rose-400/25 bg-rose-400/10 text-rose-300;
+  }
+  .severity-1 {
+    @apply border-orange-400/25 bg-orange-400/10 text-orange-300;
+  }
+  .severity-2 {
+    @apply border-amber-400/25 bg-amber-400/10 text-amber-300;
+  }
+  .severity-3 {
+    @apply border-blue-400/25 bg-blue-400/10 text-blue-300;
+  }
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, black, transparent 90%);
+}
+
+.diagram-grid {
+  background-color: #fff;
+  background-image:
+    linear-gradient(#e8edf2 1px, transparent 1px),
+    linear-gradient(90deg, #e8edf2 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.text-gradient {
+  background: linear-gradient(100deg, #fff 5%, #77efc1 48%, #6db7ff 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+select.input {
+  color-scheme: dark;
+}
+
+.figma-custom-code-fragment {
+  display: contents;
+}
+
+.figma-bypass-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 2147483647;
+  transform: translateY(-150%);
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  padding: 8px 12px;
+  font:
+    600 14px/1.2 system-ui,
+    sans-serif;
+  text-decoration: none;
+}
+
+.figma-bypass-link:focus {
+  transform: translateY(0);
+}
