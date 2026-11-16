@@ -282,7 +282,7 @@ export function ProfileView({ settings = false, user }: ProfileViewProps) {
                   <div key={attempt.id} className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3 text-xs">
                     <div>
                       <p className="font-medium text-slate-200 capitalize">{attempt.quizTitle || attempt.quizSlug} Architecture Assessment</p>
-                      <p className="text-slate-500">{new Date(attempt.completedAt).toLocaleDateString()}</p>
+                      <p className="text-slate-500">{new Date(attempt.completedAt || Date.now()).toLocaleDateString()}</p>
                     </div>
                     <div className="text-right">
                       <span className={`font-semibold ${attempt.passed ? 'text-emerald-300' : 'text-rose-300'}`}>

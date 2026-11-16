@@ -5,12 +5,12 @@ export const QuizAttempts: CollectionConfig = {
   slug: 'quiz-attempts',
   admin: {
     useAsTitle: 'id',
-    defaultColumns: ['learner', 'quiz', 'score', 'passed', 'attemptNumber', 'createdAt'],
+    defaultColumns: ['learner', 'quiz', 'score', 'passed', 'status', 'attemptNumber', 'createdAt'],
   },
   access: {
     create: isLearnerOrAdmin,
     read: isLearnerOwnerOrAdmin,
-    update: isAdmin,
+    update: isLearnerOwnerOrAdmin,
     delete: isAdmin,
   },
   hooks: {
@@ -43,9 +43,20 @@ export const QuizAttempts: CollectionConfig = {
       index: true,
     },
     {
+      name: 'status',
+      type: 'select',
+      defaultValue: 'in-progress',
+      options: [
+        { label: 'In Progress', value: 'in-progress' },
+        { label: 'Completed', value: 'completed' },
+      ],
+      required: true,
+      index: true,
+    },
+    {
       name: 'score',
       type: 'number',
-      required: true,
+      defaultValue: 0,
       min: 0,
       max: 100,
     },
@@ -57,6 +68,19 @@ export const QuizAttempts: CollectionConfig = {
     {
       name: 'correctCount',
       type: 'number',
+      defaultValue: 0,
+      min: 0,
+    },
+    {
+      name: 'incorrectCount',
+      type: 'number',
+      defaultValue: 0,
+      min: 0,
+    },
+    {
+      name: 'unansweredCount',
+      type: 'number',
+      defaultValue: 0,
       min: 0,
     },
     {
