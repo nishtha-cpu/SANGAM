@@ -11,6 +11,7 @@ export {
   logoutAction,
   requestPasswordResetAction,
   resetPasswordAction,
+  verifyEmailTokenAction,
   updateProfileAction,
   deleteAccountAction,
   type AuthState,

@@ -75,28 +75,12 @@ export function AdminDashboardLayout({
       href: '/admin-dashboard#curriculum',
       icon: 'video',
       count: safeCounts.classes,
-      badge: 'Phase 2+',
-    },
-    {
-      label: 'Case Studies',
-      href: '/admin-dashboard#cases',
-      icon: 'layers',
-      count: safeCounts.caseStudies,
-      badge: 'Phase 2+',
     },
     {
       label: 'Quizzes',
       href: '/admin-dashboard#quizzes',
       icon: 'book',
       count: safeCounts.quizzes,
-      badge: 'Phase 2+',
-    },
-    {
-      label: 'Security Patterns',
-      href: '/admin-dashboard#patterns',
-      icon: 'shield',
-      count: safeCounts.patterns,
-      badge: 'Phase 2+',
     },
     {
       label: 'Student Reviews',
@@ -112,14 +96,17 @@ export function AdminDashboardLayout({
       href: '/admin-dashboard#orders',
       icon: 'lock',
       count: safeCounts.orders,
-      badge: 'Phase 2+',
     },
     {
       label: 'Learner Directory',
       href: '/admin-dashboard#learners',
       icon: 'user',
       count: safeCounts.learners,
-      badge: 'Phase 2+',
+    },
+    {
+      label: 'Platform Analytics',
+      href: '/admin-dashboard#analytics',
+      icon: 'monitor',
     },
   ]
 

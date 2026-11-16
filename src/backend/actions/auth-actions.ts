@@ -365,6 +365,49 @@ export async function resetPasswordAction(
   }
 }
 
+/**
+ * Server Action: Verify learner email address via verification token (AU-12).
+ */
+export async function verifyEmailTokenAction(token: string): Promise<AuthState> {
+  if (!token) {
+    return { ok: false, message: 'Verification token is required.' }
+  }
+
+  try {
+    const payload = await getPayload({ config })
+    const users = await (payload as any).find({
+      collection: 'users',
+      where: {
+        emailVerificationToken: { equals: token },
+      },
+      limit: 1,
+      overrideAccess: true,
+    })
+
+    if (users.docs.length === 0) {
+      return { ok: false, message: 'Invalid or expired email verification link.' }
+    }
+
+    const user = users.docs[0]
+    await (payload as any).update({
+      collection: 'users',
+      id: user.id,
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+      },
+      overrideAccess: true,
+    })
+
+    return { ok: true, message: 'Your email has been successfully verified! You may now access all features.' }
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'Unable to verify email address.',
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // UP-1 — Profile Update & AU-13 Account Deletion
 // ---------------------------------------------------------------------------
