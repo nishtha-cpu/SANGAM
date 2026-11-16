@@ -9,6 +9,7 @@ import {
   registerDevUser,
   authenticateDevUser,
   signDevToken,
+  updateDevUser,
 } from '../auth/dev-auth'
 import { checkRateLimit, resetRateLimit } from '../security/rate-limiter'
 import { notifications } from '../notifications/email-service'
@@ -412,36 +413,92 @@ export async function verifyEmailTokenAction(token: string): Promise<AuthState> 
 // UP-1 — Profile Update & AU-13 Account Deletion
 // ---------------------------------------------------------------------------
 
+export async function getSessionUserAction(): Promise<{
+  id: string
+  name: string
+  email: string
+  role: string
+} | null> {
+  const user = await getCurrentUser()
+  if (!user || user.collection !== 'users') return null
+  return {
+    id: user.id,
+    name: user.name || (user.email ? user.email.split('@')[0] : 'Learner'),
+    email: user.email || '',
+    role: user.role || 'learner',
+  }
+}
+
 export async function updateProfileAction(
   _previous: AuthState,
   formData: FormData
 ): Promise<AuthState> {
   const user = await getCurrentUser()
-  if (!user) {
-    return { ok: false, message: 'Authentication required.' }
+  if (!user || user.collection !== 'users') {
+    return { ok: false, message: 'Authentication required. Please log in.' }
   }
 
-  const name = text(formData, 'name')
-  if (name.length < 2) {
-    return { ok: false, message: 'Name must be at least 2 characters.' }
+  const rawName = text(formData, 'name')
+  // Strip any HTML tags or control characters
+  const sanitizedName = rawName.replace(/<[^>]*>?/gm, '').trim()
+
+  if (sanitizedName.length < 2 || sanitizedName.length > 80) {
+    return { ok: false, message: 'Name must be between 2 and 80 characters.' }
   }
+
+  // Security: only allow updating 'name'. Reject/ignore role, collection, id, email changes.
+  let updateSucceeded = false
+  let updatedRecord: any = { ...user, name: sanitizedName }
 
   try {
     const payload = await getPayload({ config })
-    await payload.update({
+    const updated = await payload.update({
       collection: 'users',
       id: user.id,
-      data: { name },
+      data: { name: sanitizedName },
       overrideAccess: true,
     })
-
-    return { ok: true, message: 'Profile updated successfully.' }
-  } catch (err: unknown) {
-    return {
-      ok: false,
-      message: err instanceof Error ? err.message : 'Failed to update profile.',
+    if (updated) {
+      updateSucceeded = true
+      updatedRecord = updated
+    }
+  } catch {
+    // If Payload database is uninitialized or in local dev fallback mode,
+    // persist to the local dev store.
+    const devRes = updateDevUser(user.id, { name: sanitizedName })
+    if (devRes.ok && devRes.user) {
+      updateSucceeded = true
+      updatedRecord = devRes.user
+    } else {
+      // Try by email if id was different
+      const devResByEmail = updateDevUser(user.email, { name: sanitizedName })
+      if (devResByEmail.ok && devResByEmail.user) {
+        updateSucceeded = true
+        updatedRecord = devResByEmail.user
+      }
     }
   }
+
+  if (!updateSucceeded) {
+    return { ok: false, message: 'Failed to persist profile updates to database.' }
+  }
+
+  // Re-issue session cookie with updated identity claims so subsequent requests reflect the new name
+  try {
+    const updatedToken = signDevToken({
+      id: updatedRecord.id || user.id,
+      email: updatedRecord.email || user.email,
+      name: sanitizedName,
+      role: 'learner',
+      collection: 'users',
+      termsAcceptedAt: updatedRecord.termsAcceptedAt || user.termsAcceptedAt,
+    })
+    await setSessionCookie(updatedToken)
+  } catch {
+    // Session cookie update failure shouldn't fail the operation
+  }
+
+  return { ok: true, message: 'Profile updated successfully.' }
 }
 
 export async function deleteAccountAction(): Promise<AuthState> {

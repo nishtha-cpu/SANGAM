@@ -2,6 +2,7 @@
 
 import { getPayloadClient } from '@/backend/repositories/payload'
 import { getAdminUser } from '@/admin-panel/auth/admin-auth'
+import { getDevUsers } from '@/backend/auth/dev-auth'
 
 export type LearnerDirectoryItem = {
   id: string
@@ -44,19 +45,22 @@ export async function getLearnersDirectoryAction(): Promise<LearnerDirectoryItem
     }
   } catch {}
 
-  // Local dev mode fallback
-  return [
-    {
-      id: 'usr_alex',
-      name: 'Alex Rivera',
-      email: 'alex@example.com',
-      role: 'learner',
+  // Local dev mode fallback: read real dev users from local store
+  const devUsers = getDevUsers()
+  if (devUsers.length > 0) {
+    return devUsers.map((u) => ({
+      id: u.id,
+      name: u.name || 'Anonymous Learner',
+      email: u.email,
+      role: u.role || 'learner',
       enrolledPackages: ['professional'],
       emailVerified: true,
-      termsAcceptedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    },
-  ]
+      termsAcceptedAt: u.termsAcceptedAt,
+      createdAt: u.createdAt,
+    }))
+  }
+
+  return []
 }
 
 /**

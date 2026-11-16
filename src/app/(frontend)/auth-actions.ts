@@ -14,5 +14,6 @@ export {
   verifyEmailTokenAction,
   updateProfileAction,
   deleteAccountAction,
+  getSessionUserAction,
   type AuthState,
 } from '@/backend/actions/auth-actions'

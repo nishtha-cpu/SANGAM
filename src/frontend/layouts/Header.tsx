@@ -1,21 +1,51 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Icon } from '@frontend/components/icons'
 import { Logo } from '@frontend/components/Logo'
-import { logoutAction } from '@/backend/actions/auth-actions'
+import { logoutAction, getSessionUserAction } from '@/backend/actions/auth-actions'
 
 export interface HeaderProps {
   inner?: boolean
+  user?: {
+    name?: string
+    email?: string
+  }
 }
 
-export function Header({ inner = false }: HeaderProps) {
+export function Header({ inner = false, user: initialUser }: HeaderProps) {
+  const [currentUser, setCurrentUser] = useState(initialUser || null)
   const [menu, setMenu] = useState(false)
   const [mobile, setMobile] = useState(false)
   const [loggingOut, startLogout] = useTransition()
   const router = useRouter()
+
+  useEffect(() => {
+    if (initialUser) {
+      setCurrentUser(initialUser)
+    } else {
+      getSessionUserAction()
+        .then((u) => {
+          if (u) setCurrentUser(u)
+        })
+        .catch(() => {})
+    }
+  }, [initialUser])
+
+  const displayName =
+    currentUser?.name ||
+    (currentUser?.email ? currentUser.email.split('@')[0] : 'Learner')
+
+  const initials =
+    displayName
+      .split(' ')
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'L'
 
   function handleLogout() {
     setMenu(false)
@@ -58,13 +88,15 @@ export function Header({ inner = false }: HeaderProps) {
               className="ml-1 grid size-10 place-items-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-500 text-sm font-bold text-[#04111d]"
               aria-label="Open profile menu"
             >
-              AR
+              {initials}
             </button>
             {menu && (
               <div className="absolute right-0 top-13 w-56 rounded-2xl border border-white/10 bg-[#0c1a2a] p-2 shadow-2xl">
                 <div className="border-b border-white/8 px-3 py-3">
-                  <p className="text-sm font-semibold">Alex Rivera</p>
-                  <p className="text-xs text-slate-400">Security learner</p>
+                  <p className="text-sm font-semibold text-white">{displayName}</p>
+                  <p className="text-xs text-slate-400">
+                    {currentUser?.email || 'Security learner'}
+                  </p>
                 </div>
                 {[
                   ['My Profile', '/profile'],

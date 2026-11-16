@@ -6,6 +6,12 @@ export interface PageFrameProps {
   title?: string
   eyebrow?: string
   wide?: boolean
+  user?: {
+    id?: string
+    name?: string
+    email?: string
+    role?: string
+  }
 }
 
 export function PageFrame({
@@ -13,10 +19,11 @@ export function PageFrame({
   title,
   eyebrow,
   wide = false,
+  user,
 }: PageFrameProps) {
   return (
     <div className="flex min-h-screen flex-col">
-      <Header inner />
+      <Header inner user={user} />
       <main
         className={`mx-auto w-full flex-1 px-5 py-10 lg:px-8 lg:py-14 ${wide ? 'max-w-[1480px]' : 'max-w-[1180px]'}`}
       >

@@ -26,7 +26,7 @@ export type DevSessionUser = {
   termsAcceptedAt?: string
 }
 
-function getDevUsers(): DevUser[] {
+export function getDevUsers(): DevUser[] {
   try {
     if (fs.existsSync(DEV_USERS_FILE)) {
       const content = fs.readFileSync(DEV_USERS_FILE, 'utf8')
@@ -36,6 +36,44 @@ function getDevUsers(): DevUser[] {
     // If reading fails, fall back to empty
   }
   return []
+}
+
+export function updateDevUser(
+  idOrEmail: string,
+  updates: { name?: string }
+): { ok: boolean; user?: DevSessionUser; message?: string } {
+  const users = getDevUsers()
+  const normalizedKey = idOrEmail.toLowerCase().trim()
+  const userIndex = users.findIndex(
+    (u) => u.id === idOrEmail || u.email.toLowerCase() === normalizedKey
+  )
+
+  if (userIndex === -1) {
+    return { ok: false, message: 'User record not found in local store.' }
+  }
+
+  if (updates.name !== undefined) {
+    const trimmed = updates.name.trim()
+    if (trimmed.length < 2 || trimmed.length > 80) {
+      return { ok: false, message: 'Name must be between 2 and 80 characters.' }
+    }
+    users[userIndex].name = trimmed
+  }
+
+  saveDevUsers(users)
+
+  const updated = users[userIndex]
+  return {
+    ok: true,
+    user: {
+      id: updated.id,
+      email: updated.email,
+      name: updated.name,
+      role: 'learner',
+      collection: 'users',
+      termsAcceptedAt: updated.termsAcceptedAt,
+    },
+  }
 }
 
 function saveDevUsers(users: DevUser[]): void {

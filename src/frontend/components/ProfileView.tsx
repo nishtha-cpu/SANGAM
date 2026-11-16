@@ -27,9 +27,15 @@ export function ProfileView({ settings = false, user }: ProfileViewProps) {
   const router = useRouter()
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions' | 'privacy'>('profile')
-  const [name, setName] = useState(user?.name || 'Alex Rivera')
-  const [email] = useState(user?.email || 'alex@example.com')
+  const [name, setName] = useState(user?.name || '')
+  const [email] = useState(user?.email || '')
   const [statusMessage, setStatusMessage] = useState<{ text: string; ok: boolean } | null>(null)
+  
+  useEffect(() => {
+    if (user?.name) {
+      setName(user.name)
+    }
+  }, [user?.name])
   
   // Real database states
   const [orders, setOrders] = useState<any[]>([])
@@ -71,11 +77,19 @@ export function ProfileView({ settings = false, user }: ProfileViewProps) {
     setStatusMessage(null)
     const formData = new FormData(e.currentTarget)
     startUpdate(async () => {
-      const res = await updateProfileAction({ ok: false, message: '' }, formData)
-      if (res.ok) {
-        setStatusMessage({ text: 'Profile updated successfully', ok: true })
-      } else {
-        setStatusMessage({ text: res.message || 'Failed to update profile', ok: false })
+      try {
+        const res = await updateProfileAction({ ok: false, message: '' }, formData)
+        if (res.ok) {
+          setStatusMessage({ text: 'Profile updated successfully', ok: true })
+          router.refresh()
+        } else {
+          setStatusMessage({ text: res.message || 'Failed to update profile', ok: false })
+        }
+      } catch (err: unknown) {
+        setStatusMessage({
+          text: err instanceof Error ? err.message : 'An unexpected error occurred while saving profile.',
+          ok: false,
+        })
       }
     })
   }
@@ -96,7 +110,11 @@ export function ProfileView({ settings = false, user }: ProfileViewProps) {
 
   if (settings) {
     return (
-      <PageFrame title="Account Settings" eyebrow="Preferences & security">
+      <PageFrame
+        title="Account Settings"
+        eyebrow="Preferences & security"
+        user={user ? { ...user, name: name || user.name } : undefined}
+      >
         <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
           <nav className="card h-fit p-3">
             {[
@@ -212,22 +230,28 @@ export function ProfileView({ settings = false, user }: ProfileViewProps) {
     )
   }
 
-  const initials = (name || 'Alex Rivera')
+  const displayName = name || user?.name || (email ? email.split('@')[0] : 'Learner')
+  const initials = displayName
     .split(' ')
+    .filter(Boolean)
     .map((n) => n[0])
     .join('')
     .slice(0, 2)
-    .toUpperCase()
+    .toUpperCase() || 'L'
 
   return (
-    <PageFrame title="My Profile" eyebrow="Account & learning overview">
+    <PageFrame
+      title="My Profile"
+      eyebrow="Account & learning overview"
+      user={user ? { ...user, name: displayName } : undefined}
+    >
       <div className="grid gap-6 lg:grid-cols-[310px_1fr]">
         <aside className="card p-7 text-center">
           <div className="mx-auto grid size-24 place-items-center rounded-full bg-gradient-to-br from-emerald-300 to-cyan-500 text-2xl font-bold text-[#06111f]">
             {initials}
           </div>
-          <h2 className="mt-5 text-xl font-semibold text-white">{name}</h2>
-          <p className="mt-1 text-sm text-slate-500">{email}</p>
+          <h2 className="mt-5 text-xl font-semibold text-white">{displayName}</h2>
+          <p className="mt-1 text-sm text-slate-500">{email || user?.email}</p>
           <div className="mt-3 flex justify-center gap-1.5 flex-wrap">
             {(user?.enrolledPackages || ['professional']).map((pkg) => (
               <span key={pkg} className="rounded bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold uppercase text-emerald-300">
