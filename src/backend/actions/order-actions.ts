@@ -381,3 +381,44 @@ export async function getOrderInvoiceAction(
     createdAt: match.createdAt,
   })
 }
+
+/**
+ * Server Action / Scheduled Trigger: Evaluate upcoming subscription expirations
+ * and dispatch reminder notifications (NT-3).
+ */
+export async function runSubscriptionExpiryCheckAction(): Promise<{
+  checkedCount: number
+  remindersSent: number
+  notifications: string[]
+}> {
+  const orders = getDevOrders()
+  const now = Date.now()
+  const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000
+  let reminders = 0
+  const logs: string[] = []
+
+  for (const ord of orders) {
+    if (ord.paymentStatus === 'paid' && ord.expiryDate) {
+      const expiry = new Date(ord.expiryDate).getTime()
+      const diff = expiry - now
+      if (diff > 0 && diff <= fourteenDaysMs) {
+        reminders++
+        const days = Math.ceil(diff / (24 * 60 * 60 * 1000))
+        logs.push(`Dispatched reminder to ${ord.learnerEmail} for ${ord.package} (${days} days remaining)`)
+        notifications
+          .sendExpiryReminderEmail(
+            ord.learnerEmail || 'learner@sangam.security',
+            ord.package,
+            ord.expiryDate
+          )
+          .catch(() => {})
+      }
+    }
+  }
+
+  return {
+    checkedCount: orders.length,
+    remindersSent: reminders,
+    notifications: logs,
+  }
+}

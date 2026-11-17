@@ -29,6 +29,13 @@ import {
   getPlatformAnalyticsAction,
   type PlatformAnalyticsData,
 } from '@/admin-panel/analytics/analytics-actions'
+import {
+  getAdminMarketingContentAction,
+  saveTestimonialAction,
+  toggleTestimonialStatusAction,
+  type TestimonialItem,
+  type PromoCardItem,
+} from '@/backend/actions/marketing-actions'
 
 export interface RecentReview {
   id: string | number
@@ -64,7 +71,7 @@ export interface AdminDashboardViewProps {
   recentLearners: RecentLearner[]
 }
 
-type TabType = 'overview' | 'curriculum' | 'quizzes' | 'learners' | 'orders' | 'analytics'
+type TabType = 'overview' | 'curriculum' | 'quizzes' | 'learners' | 'orders' | 'analytics' | 'marketing'
 
 export function AdminDashboardView({
   admin,
@@ -83,17 +90,24 @@ export function AdminDashboardView({
   const [learnersList, setLearnersList] = useState<LearnerDirectoryItem[]>([])
   const [ordersList, setOrdersList] = useState<AdminOrderRecord[]>([])
   const [analyticsData, setAnalyticsData] = useState<PlatformAnalyticsData | null>(null)
+  const [marketingTestimonials, setMarketingTestimonials] = useState<TestimonialItem[]>([])
+  const [marketingPromoCards, setMarketingPromoCards] = useState<PromoCardItem[]>([])
   const [dataLoaded, setDataLoaded] = useState(false)
 
   // Modal form states
   const [showAddClassModal, setShowAddClassModal] = useState(false)
   const [showAddQuizModal, setShowAddQuizModal] = useState(false)
+  const [showAddTestimonialModal, setShowAddTestimonialModal] = useState(false)
+  const [newTestimonialAuthor, setNewTestimonialAuthor] = useState('')
+  const [newTestimonialRole, setNewTestimonialRole] = useState('')
+  const [newTestimonialCompany, setNewTestimonialCompany] = useState('')
+  const [newTestimonialContent, setNewTestimonialContent] = useState('')
 
   // Listen to hash changes for sidebar navigation
   useEffect(() => {
     function handleHash() {
       const hash = window.location.hash.replace('#', '')
-      if (['curriculum', 'quizzes', 'learners', 'orders', 'analytics'].includes(hash)) {
+      if (['curriculum', 'quizzes', 'learners', 'orders', 'analytics', 'marketing'].includes(hash)) {
         setActiveTab(hash as TabType)
       } else {
         setActiveTab('overview')
@@ -109,12 +123,13 @@ export function AdminDashboardView({
     let isMounted = true
     async function loadPanelData() {
       try {
-        const [cls, qz, lrn, ord, anl] = await Promise.all([
+        const [cls, qz, lrn, ord, anl, mkt] = await Promise.all([
           getAdminClassesAction(),
           getAdminQuizzesAction(),
           getLearnersDirectoryAction(),
           getAllOrdersAdminAction(),
           getPlatformAnalyticsAction(),
+          getAdminMarketingContentAction(),
         ])
         if (isMounted) {
           setClassesList(cls)
@@ -122,6 +137,8 @@ export function AdminDashboardView({
           setLearnersList(lrn)
           setOrdersList(ord)
           setAnalyticsData(anl)
+          setMarketingTestimonials(mkt.testimonials)
+          setMarketingPromoCards(mkt.promoCards)
           setDataLoaded(true)
         }
       } catch (err) {
@@ -212,6 +229,42 @@ export function AdminDashboardView({
     })
   }
 
+  // Handlers for Marketing & Site Content (AD-8, WS-5, WS-10)
+  const handleToggleTestimonial = (id: string, currentStatus: boolean) => {
+    startTransition(async () => {
+      const res = await toggleTestimonialStatusAction(id)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok) {
+        const mkt = await getAdminMarketingContentAction()
+        setMarketingTestimonials(mkt.testimonials)
+      }
+    })
+  }
+
+  const handleCreateTestimonial = (e: React.FormEvent) => {
+    e.preventDefault()
+    startTransition(async () => {
+      const res = await saveTestimonialAction({
+        author: newTestimonialAuthor,
+        role: newTestimonialRole,
+        company: newTestimonialCompany,
+        content: newTestimonialContent,
+        rating: 5,
+        published: true,
+      })
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok) {
+        setShowAddTestimonialModal(false)
+        setNewTestimonialAuthor('')
+        setNewTestimonialRole('')
+        setNewTestimonialCompany('')
+        setNewTestimonialContent('')
+        const mkt = await getAdminMarketingContentAction()
+        setMarketingTestimonials(mkt.testimonials)
+      }
+    })
+  }
+
   const kpis = [
     {
       title: 'Total Learners',
@@ -271,6 +324,7 @@ export function AdminDashboardView({
               { id: 'learners', label: 'Learner Directory (AD-10)', icon: 'user' },
               { id: 'orders', label: 'Orders & Invoices (AD-14)', icon: 'lock' },
               { id: 'analytics', label: 'Analytics (AN-1, AN-2)', icon: 'monitor' },
+              { id: 'marketing', label: 'Marketing & Site (AD-8, WS-5)', icon: 'spark' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -738,6 +792,151 @@ export function AdminDashboardView({
                 <p className="mt-1 text-xs text-slate-400">Architecture submissions</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 7. MARKETING & SITE CONTENT TAB (AD-8, WS-5, WS-10) */}
+        {activeTab === 'marketing' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Dynamic Site Content &amp; Testimonials (AD-8, WS-5, WS-10)</h2>
+                <p className="text-xs text-slate-400">
+                  Manage social proof, architecture practitioner testimonials, and home page promotional cards.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddTestimonialModal(true)}
+                className="button-primary text-xs shrink-0"
+              >
+                + Add Testimonial
+              </button>
+            </div>
+
+            {/* Testimonials List */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-slate-300">Published Testimonials ({marketingTestimonials.length})</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                {marketingTestimonials.map((item) => (
+                  <div key={item.id} className="card p-5 space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-white text-sm">{item.author}</p>
+                          <p className="text-xs text-slate-400">{item.role} • {item.company}</p>
+                        </div>
+                        <span
+                          className={`badge ${
+                            item.published
+                              ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+                              : 'border-slate-500/30 bg-slate-500/10 text-slate-400'
+                          }`}
+                        >
+                          {item.published ? 'Published' : 'Hidden'}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-xs italic text-slate-300">&ldquo;{item.content}&rdquo;</p>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                      <span className="text-[11px] text-amber-400">{'★'.repeat(item.rating || 5)}</span>
+                      <button
+                        onClick={() => handleToggleTestimonial(item.id, item.published)}
+                        disabled={isPending}
+                        className={`text-xs px-2.5 py-1 rounded-lg border transition ${
+                          item.published
+                            ? 'border-rose-500/30 text-rose-300 hover:bg-rose-500/10'
+                            : 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10'
+                        }`}
+                      >
+                        {item.published ? 'Unpublish' : 'Publish to Home'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal for adding testimonial */}
+            {showAddTestimonialModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                <div className="card w-full max-w-md p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-white text-base">Add New Testimonial</h3>
+                    <button
+                      onClick={() => setShowAddTestimonialModal(false)}
+                      className="text-slate-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <form onSubmit={handleCreateTestimonial} className="space-y-3">
+                    <div>
+                      <label className="text-xs text-slate-300 font-medium">Author Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={newTestimonialAuthor}
+                        onChange={(e) => setNewTestimonialAuthor(e.target.value)}
+                        placeholder="e.g. Elena Rostova"
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-slate-300 font-medium">Role</label>
+                        <input
+                          type="text"
+                          required
+                          value={newTestimonialRole}
+                          onChange={(e) => setNewTestimonialRole(e.target.value)}
+                          placeholder="e.g. Lead Architect"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-300 font-medium">Company</label>
+                        <input
+                          type="text"
+                          required
+                          value={newTestimonialCompany}
+                          onChange={(e) => setNewTestimonialCompany(e.target.value)}
+                          placeholder="e.g. Sentinel Corp"
+                          className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-300 font-medium">Review Content</label>
+                      <textarea
+                        required
+                        rows={3}
+                        value={newTestimonialContent}
+                        onChange={(e) => setNewTestimonialContent(e.target.value)}
+                        placeholder="Enter the testimonial quote..."
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddTestimonialModal(false)}
+                        className="button-secondary text-xs"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isPending}
+                        className="button-primary text-xs"
+                      >
+                        Save &amp; Publish
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

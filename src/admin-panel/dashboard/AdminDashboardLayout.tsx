@@ -108,6 +108,11 @@ export function AdminDashboardLayout({
       href: '/admin-dashboard#analytics',
       icon: 'monitor',
     },
+    {
+      label: 'Marketing & Site Content',
+      href: '/admin-dashboard#marketing',
+      icon: 'spark',
+    },
   ]
 
   return (
