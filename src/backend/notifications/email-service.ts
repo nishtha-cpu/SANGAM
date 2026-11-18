@@ -1,6 +1,6 @@
 /**
  * SANGAM — Notification & Email Delivery Service
- * Provides secure notification abstractions for auth, purchases, and evaluations.
+ * Provides secure notification abstractions for auth, purchases, evaluations, and expiry reminders.
  */
 
 export interface EmailDeliveryResult {
@@ -96,6 +96,21 @@ export class NotificationService {
     const subject = `Your Architecture Review has been Evaluated: ${reviewTitle}`
     const scoreText = typeof score === 'number' ? `Score: ${score}/100` : ''
     const body = `Your submission "${reviewTitle}" has been evaluated by an instructor.\n\nStatus: ${status.toUpperCase()}\n${scoreText}\n\nLog in to your SANGAM account to view detailed feedback and recommendations.`
+
+    return this.deliverEmail(to, subject, body)
+  }
+
+  /**
+   * Send Subscription Expiry Reminder (NT-3)
+   */
+  public async sendSubscriptionExpiryReminderEmail(
+    to: string,
+    learnerName: string,
+    packageName: string,
+    daysRemaining: number
+  ): Promise<EmailDeliveryResult> {
+    const subject = `Your SANGAM Subscription expires in ${daysRemaining} days`
+    const body = `Hello ${learnerName},\n\nYour ${packageName} subscription on SANGAM will expire in ${daysRemaining} days.\n\nTo ensure uninterrupted access to recorded classes, architecture assessments, and design review tools, please visit your dashboard to renew your license.\n\nThank you,\nSANGAM Platform Team`
 
     return this.deliverEmail(to, subject, body)
   }
