@@ -22,6 +22,7 @@ logs/
 /.plugins/
 /.opencode-skills/
 scratch/
+backups/
 
 # Figma platform local state
 .figaro/

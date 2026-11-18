@@ -2,7 +2,7 @@
 
 import fs from 'fs'
 import path from 'path'
-import { getAdminUser } from '@/admin-panel/auth/admin-auth'
+import { getAdminUser } from '../../admin-panel/auth/admin-auth'
 
 export interface TestimonialItem {
   id: string
