@@ -10,7 +10,15 @@ import {
   createOrUpdateClassAction,
   deleteClassAction,
   getAdminQuizzesAction,
-  createQuizAssessmentAction,
+  getAdminQuizDetailsAction,
+  saveAdminQuizAction,
+  deleteQuizAction,
+  toggleQuizStatusAction,
+  getAdminCoursesAction,
+  saveAdminCourseAction,
+  deleteAdminCourseAction,
+  saveAdminLessonAction,
+  deleteAdminLessonAction,
   type AdminClassItem,
   type AdminQuizItem,
 } from '@/admin-panel/curriculum/curriculum-actions'
@@ -18,8 +26,15 @@ import {
   getLearnersDirectoryAction,
   assignPackageManuallyAction,
   revokePackageManuallyAction,
+  toggleLearnerActiveStatusAction,
   type LearnerDirectoryItem,
 } from '@/admin-panel/learners/learner-actions'
+import { CourseManagementModal } from '@/admin-panel/curriculum/CourseManagementModal'
+import { LessonManagementModal } from '@/admin-panel/curriculum/LessonManagementModal'
+import { QuizBuilderModal } from '@/admin-panel/quizzes/QuizBuilderModal'
+import { QuizPreviewModal } from '@/admin-panel/quizzes/QuizPreviewModal'
+import type { CourseItem, CourseLesson } from '@/backend/repositories/courses'
+import type { QuizRecord } from '@/backend/repositories/quizzes'
 import {
   getAllOrdersAdminAction,
   refundOrCancelOrderAction,
@@ -85,6 +100,7 @@ export function AdminDashboardView({
   const [actionMessage, setActionMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
   // Sub-panel data states
+  const [coursesList, setCoursesList] = useState<CourseItem[]>([])
   const [classesList, setClassesList] = useState<AdminClassItem[]>([])
   const [quizzesList, setQuizzesList] = useState<AdminQuizItem[]>([])
   const [learnersList, setLearnersList] = useState<LearnerDirectoryItem[]>([])
@@ -94,9 +110,21 @@ export function AdminDashboardView({
   const [marketingPromoCards, setMarketingPromoCards] = useState<PromoCardItem[]>([])
   const [dataLoaded, setDataLoaded] = useState(false)
 
+  // Search & Filter states
+  const [learnerSearch, setLearnerSearch] = useState('')
+  const [quizSearch, setQuizSearch] = useState('')
+  const [orderSearch, setOrderSearch] = useState('')
+
   // Modal form states
+  const [showCourseModal, setShowCourseModal] = useState(false)
+  const [editingCourse, setEditingCourse] = useState<CourseItem | null>(null)
+  const [selectedCourseForLessons, setSelectedCourseForLessons] = useState<CourseItem | null>(null)
+
   const [showAddClassModal, setShowAddClassModal] = useState(false)
-  const [showAddQuizModal, setShowAddQuizModal] = useState(false)
+  const [showQuizModal, setShowQuizModal] = useState(false)
+  const [editingQuiz, setEditingQuiz] = useState<QuizRecord | null>(null)
+  const [previewingQuiz, setPreviewingQuiz] = useState<QuizRecord | null>(null)
+
   const [showAddTestimonialModal, setShowAddTestimonialModal] = useState(false)
   const [newTestimonialAuthor, setNewTestimonialAuthor] = useState('')
   const [newTestimonialRole, setNewTestimonialRole] = useState('')
@@ -123,7 +151,8 @@ export function AdminDashboardView({
     let isMounted = true
     async function loadPanelData() {
       try {
-        const [cls, qz, lrn, ord, anl, mkt] = await Promise.all([
+        const [crs, cls, qz, lrn, ord, anl, mkt] = await Promise.all([
+          getAdminCoursesAction(),
           getAdminClassesAction(),
           getAdminQuizzesAction(),
           getLearnersDirectoryAction(),
@@ -132,6 +161,7 @@ export function AdminDashboardView({
           getAdminMarketingContentAction(),
         ])
         if (isMounted) {
+          setCoursesList(crs)
           setClassesList(cls)
           setQuizzesList(qz)
           setLearnersList(lrn)
@@ -175,6 +205,131 @@ export function AdminDashboardView({
         setLearnersList(updated)
       }
     })
+  }
+
+  const handleToggleLearnerActive = (learnerId: string, currentActive: boolean) => {
+    const newState = !currentActive
+    setActionMessage(null)
+    startTransition(async () => {
+      const res = await toggleLearnerActiveStatusAction(learnerId, newState)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok) {
+        const updated = await getLearnersDirectoryAction()
+        setLearnersList(updated)
+      }
+    })
+  }
+
+  // Handlers for Courses & Video Management (Module 5 & Module 6)
+  const handleSaveCourse = (courseData: Partial<CourseItem>) => {
+    setActionMessage(null)
+    startTransition(async () => {
+      const res = await saveAdminCourseAction(courseData)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok) {
+        setShowCourseModal(false)
+        setEditingCourse(null)
+        const updated = await getAdminCoursesAction()
+        setCoursesList(updated)
+      }
+    })
+  }
+
+  const handleDeleteCourse = (courseId: string) => {
+    if (!confirm('Are you sure you want to delete this course and all its lessons?')) return
+    setActionMessage(null)
+    startTransition(async () => {
+      const res = await deleteAdminCourseAction(courseId)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok) {
+        const updated = await getAdminCoursesAction()
+        setCoursesList(updated)
+      }
+    })
+  }
+
+  const handleSaveLesson = (lessonData: Partial<CourseLesson>) => {
+    if (!selectedCourseForLessons) return
+    setActionMessage(null)
+    startTransition(async () => {
+      const res = await saveAdminLessonAction(selectedCourseForLessons.id, lessonData)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok && res.course) {
+        setSelectedCourseForLessons(res.course)
+        const updated = await getAdminCoursesAction()
+        setCoursesList(updated)
+      }
+    })
+  }
+
+  const handleDeleteLesson = (lessonId: string) => {
+    if (!selectedCourseForLessons) return
+    if (!confirm('Are you sure you want to remove this video lesson?')) return
+    setActionMessage(null)
+    startTransition(async () => {
+      const res = await deleteAdminLessonAction(selectedCourseForLessons.id, lessonId)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok && res.course) {
+        setSelectedCourseForLessons(res.course)
+        const updated = await getAdminCoursesAction()
+        setCoursesList(updated)
+      }
+    })
+  }
+
+  // Handlers for Quizzes Management (Module 5 & QZ)
+  const handleSaveQuiz = (quizData: any) => {
+    setActionMessage(null)
+    startTransition(async () => {
+      const res = await saveAdminQuizAction(quizData)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok) {
+        setShowQuizModal(false)
+        setEditingQuiz(null)
+        const updated = await getAdminQuizzesAction()
+        setQuizzesList(updated)
+      }
+    })
+  }
+
+  const handleDeleteQuiz = (quizId: string) => {
+    if (!confirm('Are you sure you want to delete this quiz?')) return
+    setActionMessage(null)
+    startTransition(async () => {
+      const res = await deleteQuizAction(quizId)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok) {
+        const updated = await getAdminQuizzesAction()
+        setQuizzesList(updated)
+      }
+    })
+  }
+
+  const handleToggleQuizStatus = (quizId: string) => {
+    setActionMessage(null)
+    startTransition(async () => {
+      const res = await toggleQuizStatusAction(quizId)
+      setActionMessage({ text: res.message, ok: res.ok })
+      if (res.ok) {
+        const updated = await getAdminQuizzesAction()
+        setQuizzesList(updated)
+      }
+    })
+  }
+
+  const handleEditQuiz = async (quizItem: AdminQuizItem) => {
+    const details = await getAdminQuizDetailsAction(quizItem.id)
+    if (details) {
+      setEditingQuiz(details)
+      setShowQuizModal(true)
+    }
+  }
+
+  const handlePreviewQuiz = async (quizItem: AdminQuizItem) => {
+    const details = await getAdminQuizDetailsAction(quizItem.id)
+    if (details) {
+      setPreviewingQuiz(details)
+    }
   }
 
   // Handlers for Curriculum Management
@@ -466,58 +621,172 @@ export function AdminDashboardView({
           </div>
         )}
 
-        {/* 2. CURRICULUM & CLASSES TAB (AD-1, AD-2, AD-3, AD-4, AD-5) */}
+        {/* 2. CURRICULUM & COURSES TAB (Module 5 & Module 6) */}
         {activeTab === 'curriculum' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="space-y-8">
+            {/* Top Bar for Courses */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-bold text-white">Recorded Classes &amp; Lectures (AD-1)</h2>
-                <p className="text-xs text-slate-400">Manage video masterclasses, instructors, and section tags.</p>
+                <h2 className="text-lg font-bold text-white">
+                  Architecture Courses &amp; Masterclasses (Module 5)
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Manage comprehensive multi-lesson courses, pricing, and trial video assignments (Module 6).
+                </p>
               </div>
               <button
-                onClick={() => setShowAddClassModal(true)}
-                className="button-primary text-xs bg-amber-400 text-black hover:bg-amber-300 font-semibold"
+                type="button"
+                onClick={() => {
+                  setEditingCourse(null)
+                  setShowCourseModal(true)
+                }}
+                className="button-primary text-xs bg-emerald-400 text-slate-950 hover:bg-emerald-300 font-bold"
               >
-                + Add Video Class
+                + Add Architecture Course
               </button>
             </div>
 
+            {/* Courses Table */}
             <div className="card overflow-hidden">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-white/8 bg-white/[0.02] text-slate-400">
                   <tr>
-                    <th className="p-3">Class Title</th>
-                    <th className="p-3">Instructor</th>
-                    <th className="p-3">Duration</th>
-                    <th className="p-3">Section</th>
-                    <th className="p-3">Tier</th>
+                    <th className="p-3">Course Title</th>
+                    <th className="p-3">Category</th>
+                    <th className="p-3">Level</th>
+                    <th className="p-3">Price</th>
+                    <th className="p-3">Lessons &amp; Trial</th>
+                    <th className="p-3">Status</th>
                     <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {classesList.map((cls) => (
-                    <tr key={cls.id} className="hover:bg-white/[0.02]">
-                      <td className="p-3 font-medium text-white">{cls.title}</td>
-                      <td className="p-3 text-slate-300">{cls.instructor}</td>
-                      <td className="p-3 text-slate-400">{cls.duration}</td>
-                      <td className="p-3 text-slate-400">{cls.section || 'General'}</td>
-                      <td className="p-3">
-                        <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${cls.isPremium ? 'bg-amber-400/10 text-amber-300' : 'bg-emerald-400/10 text-emerald-300'}`}>
-                          {cls.isPremium ? 'PREMIUM' : 'FREE'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleDeleteClass(cls.id)}
-                          className="text-rose-400 hover:underline"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {coursesList.map((crs) => {
+                    const trialLesson = crs.lessons.find((l) => l.isTrial)
+                    return (
+                      <tr key={crs.id} className="hover:bg-white/[0.02]">
+                        <td className="p-3">
+                          <p className="font-semibold text-white">{crs.title}</p>
+                          <p className="text-[11px] text-slate-400">{crs.duration} • {crs.instructor}</p>
+                        </td>
+                        <td className="p-3 text-slate-300">{crs.category}</td>
+                        <td className="p-3 text-slate-400">{crs.level}</td>
+                        <td className="p-3 font-semibold text-emerald-300">{crs.price}</td>
+                        <td className="p-3">
+                          <div className="space-y-0.5">
+                            <span className="text-white font-medium">{crs.lessons.length} lessons</span>
+                            {trialLesson ? (
+                              <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                Trial: {trialLesson.title.slice(0, 24)}...
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-amber-400">No trial video set</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                              crs.published
+                                ? 'bg-emerald-400/10 text-emerald-300'
+                                : 'bg-slate-400/10 text-slate-400'
+                            }`}
+                          >
+                            {crs.published ? 'PUBLISHED' : 'DRAFT'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCourseForLessons(crs)}
+                            className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 text-[11px] font-medium hover:bg-emerald-500/20"
+                          >
+                            Manage Lessons &amp; Trial
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCourse(crs)
+                              setShowCourseModal(true)
+                            }}
+                            className="px-2 py-1 rounded bg-white/5 text-slate-300 text-[11px] hover:bg-white/10"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCourse(crs.id)}
+                            className="text-rose-400 hover:text-rose-200 text-[11px]"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Standalone Video Classes (AD-1) */}
+            <div className="pt-4 border-t border-white/10 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-white">Individual Lecture Masterclasses (AD-1)</h3>
+                  <p className="text-xs text-slate-400">Manage individual recorded masterclass videos.</p>
+                </div>
+                <button
+                  onClick={() => setShowAddClassModal(true)}
+                  className="button-secondary text-xs"
+                >
+                  + Add Standalone Class
+                </button>
+              </div>
+
+              <div className="card overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-white/8 bg-white/[0.02] text-slate-400">
+                    <tr>
+                      <th className="p-3">Class Title</th>
+                      <th className="p-3">Instructor</th>
+                      <th className="p-3">Duration</th>
+                      <th className="p-3">Section</th>
+                      <th className="p-3">Tier</th>
+                      <th className="p-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {classesList.map((cls) => (
+                      <tr key={cls.id} className="hover:bg-white/[0.02]">
+                        <td className="p-3 font-medium text-white">{cls.title}</td>
+                        <td className="p-3 text-slate-300">{cls.instructor}</td>
+                        <td className="p-3 text-slate-400">{cls.duration}</td>
+                        <td className="p-3 text-slate-400">{cls.section || 'General'}</td>
+                        <td className="p-3">
+                          <span
+                            className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
+                              cls.isPremium
+                                ? 'bg-amber-400/10 text-amber-300'
+                                : 'bg-emerald-400/10 text-emerald-300'
+                            }`}
+                          >
+                            {cls.isPremium ? 'PREMIUM' : 'FREE'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => handleDeleteClass(cls.id)}
+                            className="text-rose-400 hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Modal: Add Class */}
@@ -573,13 +842,34 @@ export function AdminDashboardView({
           </div>
         )}
 
-        {/* 3. QUIZZES MANAGEMENT TAB (AD-13, QZ-1) */}
+        {/* 3. QUIZZES MANAGEMENT TAB (AD-13, QZ-1, QZ-2) */}
         {activeTab === 'quizzes' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold text-white">Architecture Assessment Quizzes (AD-13, QZ-1)</h2>
-                <p className="text-xs text-slate-400">Configure quiz modules, passing thresholds, and questions.</p>
+                <p className="text-xs text-slate-400">
+                  Configure scenario assessments, questions with option scoring, passing marks, and time limits.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={quizSearch}
+                  onChange={(e) => setQuizSearch(e.target.value)}
+                  placeholder="Filter quizzes..."
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingQuiz(null)
+                    setShowQuizModal(true)
+                  }}
+                  className="button-primary text-xs bg-emerald-400 text-slate-950 hover:bg-emerald-300 font-bold whitespace-nowrap"
+                >
+                  + Create Assessment Quiz
+                </button>
               </div>
             </div>
 
@@ -593,37 +883,86 @@ export function AdminDashboardView({
                     <th className="p-3">Passing Score</th>
                     <th className="p-3">Questions</th>
                     <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {quizzesList.map((qz) => (
-                    <tr key={qz.id} className="hover:bg-white/[0.02]">
-                      <td className="p-3 font-medium text-white">{qz.title}</td>
-                      <td className="p-3 text-slate-300">{qz.domain || 'Core Principles'}</td>
-                      <td className="p-3 text-slate-400">{qz.difficulty}</td>
-                      <td className="p-3 font-semibold text-emerald-300">{qz.passingScore}%</td>
-                      <td className="p-3 text-slate-300">{qz.questionCount} questions</td>
-                      <td className="p-3">
-                        <span className="rounded bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                          PUBLISHED
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {quizzesList
+                    .filter(
+                      (q) =>
+                        q.title.toLowerCase().includes(quizSearch.toLowerCase()) ||
+                        (q.domain && q.domain.toLowerCase().includes(quizSearch.toLowerCase()))
+                    )
+                    .map((qz) => (
+                      <tr key={qz.id} className="hover:bg-white/[0.02]">
+                        <td className="p-3 font-medium text-white">{qz.title}</td>
+                        <td className="p-3 text-slate-300">{qz.domain || 'Core Principles'}</td>
+                        <td className="p-3 text-slate-400">{qz.difficulty}</td>
+                        <td className="p-3 font-semibold text-emerald-300">{qz.passingScore}%</td>
+                        <td className="p-3 text-slate-300">{qz.questionCount} questions</td>
+                        <td className="p-3">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleQuizStatus(qz.id)}
+                            className={`rounded px-2 py-0.5 text-[10px] font-semibold transition ${
+                              qz.published
+                                ? 'bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20'
+                                : 'bg-slate-400/10 text-slate-400 hover:bg-slate-400/20'
+                            }`}
+                          >
+                            {qz.published ? 'PUBLISHED' : 'DRAFT'}
+                          </button>
+                        </td>
+                        <td className="p-3 text-right space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handlePreviewQuiz(qz)}
+                            className="px-2 py-1 rounded bg-white/5 text-slate-300 hover:bg-white/10 text-[11px]"
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditQuiz(qz)}
+                            className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 text-[11px]"
+                          >
+                            Edit Questions
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteQuiz(qz.id)}
+                            className="text-rose-400 hover:text-rose-200 text-[11px]"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* 4. LEARNER DIRECTORY TAB (AD-10, AD-11, AD-12, PY-5) */}
+        {/* 4. LEARNER DIRECTORY TAB (AD-10, AD-11, AD-12, Module 5) */}
         {activeTab === 'learners' && (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-white">Learner Accounts &amp; Package Assignment (AD-10, AD-12)</h2>
-              <p className="text-xs text-slate-400">
-                View registered learners, inspect enrollment packages, and assign packages manually when needed.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Learner Accounts &amp; Access Controls (AD-10, AD-12)</h2>
+                <p className="text-xs text-slate-400">
+                  Search learners, view verified enrollments, toggle account status (activate/deactivate), or assign packages.
+                </p>
+              </div>
+              <div className="w-full sm:w-64">
+                <input
+                  type="text"
+                  value={learnerSearch}
+                  onChange={(e) => setLearnerSearch(e.target.value)}
+                  placeholder="Search name or email..."
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none"
+                />
+              </div>
             </div>
 
             <div className="card overflow-hidden">
@@ -632,66 +971,94 @@ export function AdminDashboardView({
                   <tr>
                     <th className="p-3">Learner</th>
                     <th className="p-3">Email</th>
+                    <th className="p-3">Account Status</th>
                     <th className="p-3">Active Packages</th>
-                    <th className="p-3">Manual Package Assignment (AD-12)</th>
-                    <th className="p-3 text-right">Registered</th>
+                    <th className="p-3">Manual Package Assignment</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {learnersList.map((lrn) => (
-                    <tr key={lrn.id} className="hover:bg-white/[0.02]">
-                      <td className="p-3 font-medium text-white">{lrn.name}</td>
-                      <td className="p-3 text-slate-300">{lrn.email}</td>
-                      <td className="p-3">
-                        <div className="flex flex-wrap gap-1">
-                          {lrn.enrolledPackages.length > 0 ? (
-                            lrn.enrolledPackages.map((pkg) => (
-                              <span
-                                key={pkg}
-                                className="group relative inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300"
-                              >
-                                {pkg}
-                                <button
-                                  onClick={() => handleRevokePackage(lrn.id, pkg)}
-                                  className="text-rose-400 hover:text-rose-200"
-                                  title={`Revoke ${pkg}`}
+                  {learnersList
+                    .filter(
+                      (l) =>
+                        l.name.toLowerCase().includes(learnerSearch.toLowerCase()) ||
+                        l.email.toLowerCase().includes(learnerSearch.toLowerCase())
+                    )
+                    .map((lrn) => (
+                      <tr key={lrn.id} className="hover:bg-white/[0.02]">
+                        <td className="p-3 font-medium text-white">{lrn.name}</td>
+                        <td className="p-3 text-slate-300">{lrn.email}</td>
+                        <td className="p-3">
+                          <span
+                            className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                              lrn.isActive !== false
+                                ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
+                            }`}
+                          >
+                            {lrn.isActive !== false ? 'ACTIVE' : 'DEACTIVATED'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-wrap gap-1">
+                            {lrn.enrolledPackages.length > 0 ? (
+                              lrn.enrolledPackages.map((pkg) => (
+                                <span
+                                  key={pkg}
+                                  className="group relative inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-300"
                                 >
-                                  ×
-                                </button>
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-slate-500">None</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-1">
+                                  {pkg}
+                                  <button
+                                    onClick={() => handleRevokePackage(lrn.id, pkg)}
+                                    className="text-rose-400 hover:text-rose-200"
+                                    title={`Revoke ${pkg}`}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-slate-500">None</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleAssignPackage(lrn.id, 'foundation')}
+                              className="rounded bg-white/5 px-2 py-1 text-[10px] hover:bg-white/10"
+                            >
+                              + Foundation
+                            </button>
+                            <button
+                              onClick={() => handleAssignPackage(lrn.id, 'professional')}
+                              className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-1 text-[10px] hover:bg-emerald-500/30"
+                            >
+                              + Professional
+                            </button>
+                            <button
+                              onClick={() => handleAssignPackage(lrn.id, 'enterprise')}
+                              className="rounded bg-cyan-500/20 text-cyan-300 px-2 py-1 text-[10px] hover:bg-cyan-500/30"
+                            >
+                              + Enterprise
+                            </button>
+                          </div>
+                        </td>
+                        <td className="p-3 text-right">
                           <button
-                            onClick={() => handleAssignPackage(lrn.id, 'foundation')}
-                            className="rounded bg-white/5 px-2 py-1 text-[10px] hover:bg-white/10"
+                            type="button"
+                            onClick={() => handleToggleLearnerActive(lrn.id, lrn.isActive !== false)}
+                            className={`px-2 py-1 rounded text-[11px] font-medium transition ${
+                              lrn.isActive !== false
+                                ? 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                                : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                            }`}
                           >
-                            + Foundation
+                            {lrn.isActive !== false ? 'Deactivate' : 'Activate'}
                           </button>
-                          <button
-                            onClick={() => handleAssignPackage(lrn.id, 'professional')}
-                            className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-1 text-[10px] hover:bg-emerald-500/30"
-                          >
-                            + Professional
-                          </button>
-                          <button
-                            onClick={() => handleAssignPackage(lrn.id, 'enterprise')}
-                            className="rounded bg-cyan-500/20 text-cyan-300 px-2 py-1 text-[10px] hover:bg-cyan-500/30"
-                          >
-                            + Enterprise
-                          </button>
-                        </div>
-                      </td>
-                      <td className="p-3 text-right text-slate-400">
-                        {lrn.createdAt ? new Date(lrn.createdAt).toLocaleDateString() : 'Active'}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -701,9 +1068,20 @@ export function AdminDashboardView({
         {/* 5. ORDERS & INVOICES TAB (AD-14, PY-6, PY-9) */}
         {activeTab === 'orders' && (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-white">Billing, Orders &amp; Invoices (AD-14, PY-6)</h2>
-              <p className="text-xs text-slate-400">All customer transactions, generated tax invoices, and payment statuses.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Billing, Orders &amp; Invoices (AD-14, PY-6)</h2>
+                <p className="text-xs text-slate-400">All customer transactions, generated tax invoices, and payment statuses.</p>
+              </div>
+              <div className="w-full sm:w-64">
+                <input
+                  type="text"
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="Filter tx ref or email..."
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none"
+                />
+              </div>
             </div>
 
             <div className="card overflow-hidden">
@@ -720,39 +1098,46 @@ export function AdminDashboardView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {ordersList.map((ord) => (
-                    <tr key={ord.id} className="hover:bg-white/[0.02]">
-                      <td className="p-3 font-mono text-slate-300">{ord.transactionReference}</td>
-                      <td className="p-3 font-mono text-emerald-300">{ord.invoiceNumber || '—'}</td>
-                      <td className="p-3 text-slate-300">
-                        <p className="font-medium text-white">{ord.learnerName}</p>
-                        <p className="text-[11px] text-slate-400">{ord.learnerEmail}</p>
-                      </td>
-                      <td className="p-3 uppercase text-slate-200">{ord.packageName}</td>
-                      <td className="p-3 font-semibold text-white">${ord.amount}.00</td>
-                      <td className="p-3">
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                            ord.paymentStatus === 'paid'
-                              ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
-                          }`}
-                        >
-                          {ord.paymentStatus}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        {ord.paymentStatus === 'paid' && (
-                          <button
-                            onClick={() => handleRefundOrder(ord.id)}
-                            className="text-rose-400 hover:underline"
+                  {ordersList
+                    .filter(
+                      (o) =>
+                        o.transactionReference.toLowerCase().includes(orderSearch.toLowerCase()) ||
+                        (o.learnerEmail && o.learnerEmail.toLowerCase().includes(orderSearch.toLowerCase())) ||
+                        (o.invoiceNumber && o.invoiceNumber.toLowerCase().includes(orderSearch.toLowerCase()))
+                    )
+                    .map((ord) => (
+                      <tr key={ord.id} className="hover:bg-white/[0.02]">
+                        <td className="p-3 font-mono text-slate-300">{ord.transactionReference}</td>
+                        <td className="p-3 font-mono text-emerald-300">{ord.invoiceNumber || '—'}</td>
+                        <td className="p-3 text-slate-300">
+                          <p className="font-medium text-white">{ord.learnerName}</p>
+                          <p className="text-[11px] text-slate-400">{ord.learnerEmail}</p>
+                        </td>
+                        <td className="p-3 uppercase text-slate-200">{ord.packageName}</td>
+                        <td className="p-3 font-semibold text-white">${ord.amount}.00</td>
+                        <td className="p-3">
+                          <span
+                            className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                              ord.paymentStatus === 'paid'
+                                ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
+                            }`}
                           >
-                            Cancel / Refund
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                            {ord.paymentStatus}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          {ord.paymentStatus === 'paid' && (
+                            <button
+                              onClick={() => handleRefundOrder(ord.id)}
+                              className="text-rose-400 hover:underline"
+                            >
+                              Cancel / Refund
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -938,6 +1323,48 @@ export function AdminDashboardView({
               </div>
             )}
           </div>
+        )}
+
+        {/* Modals for Courses, Lessons, Quizzes Management (Module 5 & Module 6) */}
+        {showCourseModal && (
+          <CourseManagementModal
+            course={editingCourse}
+            onClose={() => {
+              setShowCourseModal(false)
+              setEditingCourse(null)
+            }}
+            onSave={handleSaveCourse}
+            isPending={isPending}
+          />
+        )}
+
+        {selectedCourseForLessons && (
+          <LessonManagementModal
+            course={selectedCourseForLessons}
+            onClose={() => setSelectedCourseForLessons(null)}
+            onSaveLesson={handleSaveLesson}
+            onDeleteLesson={handleDeleteLesson}
+            isPending={isPending}
+          />
+        )}
+
+        {showQuizModal && (
+          <QuizBuilderModal
+            quiz={editingQuiz}
+            onClose={() => {
+              setShowQuizModal(false)
+              setEditingQuiz(null)
+            }}
+            onSave={handleSaveQuiz}
+            isPending={isPending}
+          />
+        )}
+
+        {previewingQuiz && (
+          <QuizPreviewModal
+            quiz={previewingQuiz}
+            onClose={() => setPreviewingQuiz(null)}
+          />
         )}
       </div>
     </AdminDashboardLayout>

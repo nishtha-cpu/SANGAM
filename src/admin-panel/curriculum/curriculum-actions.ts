@@ -208,18 +208,259 @@ export async function getAdminQuizzesAction(): Promise<AdminQuizItem[]> {
     }
   } catch {}
 
-  return [
-    {
-      id: 'quiz_sec_fund',
-      title: 'Security Architecture Fundamentals',
-      slug: 'security-architecture-fundamentals',
-      domain: 'Core Principles',
-      difficulty: 'Beginner',
-      passingScore: 80,
-      questionCount: 7,
-      published: true,
-    },
-  ]
+  // Fallback to local quizzes repository (Module 5 & QZ)
+  const { getAllQuizzes } = await import('@/backend/repositories/quizzes')
+  const localQuizzes = getAllQuizzes()
+  return localQuizzes.map((q) => ({
+    id: q.id,
+    title: q.title,
+    slug: q.slug,
+    domain: q.domain,
+    difficulty: q.difficulty,
+    passingScore: q.passingScore,
+    questionCount: q.questions.length,
+    published: q.published,
+    updatedAt: q.updatedAt,
+  }))
+}
+
+/**
+ * Server Action: Retrieve full quiz details with questions for editing & preview (Module 5, QZ-1).
+ */
+export async function getAdminQuizDetailsAction(idOrSlug: string) {
+  const admin = await getAdminUser()
+  if (!admin) return null
+
+  const { getAllQuizzes } = await import('@/backend/repositories/quizzes')
+  const quizzes = getAllQuizzes()
+  const match = quizzes.find((q) => q.id === idOrSlug || q.slug.toLowerCase() === idOrSlug.toLowerCase())
+  return match || null
+}
+
+/**
+ * Server Action: Save quiz with question builder data (Module 5, QZ-1, QZ-2).
+ */
+export async function saveAdminQuizAction(quizData: {
+  id?: string
+  title: string
+  slug?: string
+  domain: string
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced'
+  durationMinutes: number
+  passingScore: number
+  attemptLimit: number
+  published: boolean
+  courseSlug?: string
+  questions: {
+    id?: string
+    question: string
+    options: string[]
+    correctAnswer: number
+    marks: number
+    explanation?: string
+  }[]
+}): Promise<{ ok: boolean; message: string; quiz?: any }> {
+  const admin = await getAdminUser()
+  if (!admin) {
+    return { ok: false, message: 'Unauthorized: Administrator access required.' }
+  }
+
+  if (!quizData.title || !quizData.questions || quizData.questions.length === 0) {
+    return { ok: false, message: 'Quiz title and at least one question are required.' }
+  }
+
+  const { saveQuiz } = await import('@/backend/repositories/quizzes')
+  const formattedQuestions = quizData.questions.map((q, idx) => ({
+    id: q.id || `q_${Date.now()}_${idx}`,
+    question: q.question,
+    options: q.options,
+    correctAnswer: Number(q.correctAnswer) || 0,
+    marks: Number(q.marks) || 10,
+    explanation: q.explanation || '',
+  }))
+
+  const saved = saveQuiz({
+    ...quizData,
+    questions: formattedQuestions,
+  })
+
+  return { ok: true, message: 'Quiz saved successfully.', quiz: saved }
+}
+
+/**
+ * Server Action: Delete a quiz assessment (Module 5).
+ */
+export async function deleteQuizAction(quizId: string): Promise<{ ok: boolean; message: string }> {
+  const admin = await getAdminUser()
+  if (!admin) {
+    return { ok: false, message: 'Unauthorized: Administrator access required.' }
+  }
+
+  const { deleteQuiz } = await import('@/backend/repositories/quizzes')
+  const deleted = deleteQuiz(quizId)
+  if (deleted) {
+    return { ok: true, message: 'Quiz deleted successfully.' }
+  }
+  return { ok: false, message: 'Quiz not found.' }
+}
+
+/**
+ * Server Action: Toggle published status for a quiz (Module 5).
+ */
+export async function toggleQuizStatusAction(quizId: string): Promise<{ ok: boolean; message: string; published?: boolean }> {
+  const admin = await getAdminUser()
+  if (!admin) {
+    return { ok: false, message: 'Unauthorized: Administrator access required.' }
+  }
+
+  const { toggleQuizPublished } = await import('@/backend/repositories/quizzes')
+  const updated = toggleQuizPublished(quizId)
+  if (updated) {
+    return {
+      ok: true,
+      message: `Quiz is now ${updated.published ? 'Published' : 'Draft'}.`,
+      published: updated.published,
+    }
+  }
+  return { ok: false, message: 'Quiz not found.' }
+}
+
+/**
+ * Server Action: Retrieve courses catalog for admin management (Module 5 & Module 6).
+ */
+export async function getAdminCoursesAction() {
+  const admin = await getAdminUser()
+  if (!admin) return []
+
+  const { getAllCourses } = await import('@/backend/repositories/courses')
+  return getAllCourses()
+}
+
+/**
+ * Server Action: Save course metadata (Module 5).
+ */
+export async function saveAdminCourseAction(courseData: any): Promise<{ ok: boolean; message: string; course?: any }> {
+  const admin = await getAdminUser()
+  if (!admin) {
+    return { ok: false, message: 'Unauthorized: Administrator access required.' }
+  }
+
+  if (!courseData.title) {
+    return { ok: false, message: 'Course title is required.' }
+  }
+
+  const { saveCourse } = await import('@/backend/repositories/courses')
+  const saved = saveCourse(courseData)
+  return { ok: true, message: 'Course saved successfully.', course: saved }
+}
+
+/**
+ * Server Action: Delete a course (Module 5).
+ */
+export async function deleteAdminCourseAction(courseId: string): Promise<{ ok: boolean; message: string }> {
+  const admin = await getAdminUser()
+  if (!admin) {
+    return { ok: false, message: 'Unauthorized: Administrator access required.' }
+  }
+
+  const { deleteCourse } = await import('@/backend/repositories/courses')
+  const deleted = deleteCourse(courseId)
+  if (deleted) {
+    return { ok: true, message: 'Course deleted successfully.' }
+  }
+  return { ok: false, message: 'Course not found.' }
+}
+
+/**
+ * Server Action: Save lesson with trial uniqueness enforcement (Module 5 & Module 6).
+ * Exactly one trial video allowed per course: setting a new trial replaces the previous.
+ */
+export async function saveAdminLessonAction(
+  courseId: string,
+  lessonData: any
+): Promise<{ ok: boolean; message: string; course?: any }> {
+  const admin = await getAdminUser()
+  if (!admin) {
+    return { ok: false, message: 'Unauthorized: Administrator access required.' }
+  }
+
+  const { getAllCourses, saveCourse } = await import('@/backend/repositories/courses')
+  const courses = getAllCourses()
+  const course = courses.find((c) => c.id === courseId || c.slug === courseId)
+
+  if (!course) {
+    return { ok: false, message: 'Course not found.' }
+  }
+
+  const lessons = [...course.lessons]
+  const existingIdx = lessons.findIndex((l) => l.id === lessonData.id)
+
+  const updatedLesson = {
+    id: lessonData.id || `lsn_${Date.now()}`,
+    title: lessonData.title,
+    description: lessonData.description || '',
+    duration: lessonData.duration || '15 minutes',
+    videoUrl: lessonData.videoUrl || '',
+    order: Number(lessonData.order) || lessons.length + 1,
+    isTrial: Boolean(lessonData.isTrial),
+    isPremium: !Boolean(lessonData.isTrial),
+  }
+
+  // If this lesson is set to trial, ensure all other lessons have isTrial = false (Module 6 invariant)
+  if (updatedLesson.isTrial) {
+    lessons.forEach((l) => {
+      l.isTrial = false
+      l.isPremium = true
+    })
+  }
+
+  if (existingIdx >= 0) {
+    lessons[existingIdx] = updatedLesson
+  } else {
+    lessons.push(updatedLesson)
+  }
+
+  const saved = saveCourse({
+    ...course,
+    lessons,
+  })
+
+  return { ok: true, message: 'Lesson saved successfully with trial uniqueness enforced.', course: saved }
+}
+
+/**
+ * Server Action: Delete a lesson from a course (Module 5).
+ */
+export async function deleteAdminLessonAction(
+  courseId: string,
+  lessonId: string
+): Promise<{ ok: boolean; message: string; course?: any }> {
+  const admin = await getAdminUser()
+  if (!admin) {
+    return { ok: false, message: 'Unauthorized: Administrator access required.' }
+  }
+
+  const { getAllCourses, saveCourse } = await import('@/backend/repositories/courses')
+  const courses = getAllCourses()
+  const course = courses.find((c) => c.id === courseId || c.slug === courseId)
+
+  if (!course) {
+    return { ok: false, message: 'Course not found.' }
+  }
+
+  const updatedLessons = course.lessons.filter((l) => l.id !== lessonId)
+  // Ensure at least one lesson is trial if any lessons remain
+  if (updatedLessons.length > 0 && !updatedLessons.some((l) => l.isTrial)) {
+    updatedLessons[0].isTrial = true
+    updatedLessons[0].isPremium = false
+  }
+
+  const saved = saveCourse({
+    ...course,
+    lessons: updatedLessons,
+  })
+
+  return { ok: true, message: 'Lesson removed.', course: saved }
 }
 
 /**

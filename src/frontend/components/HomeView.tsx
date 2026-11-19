@@ -11,16 +11,25 @@ import {
   type TestimonialItem,
   type PromoCardItem,
 } from '@/backend/actions/marketing-actions'
+import { getPublicCoursesAction } from '@/backend/actions/course-actions'
+import { CourseItem } from '@/backend/repositories/courses'
 
 export function HomeView() {
   const [testimonials, setTestimonials] = useState<TestimonialItem[]>([])
   const [promoCards, setPromoCards] = useState<PromoCardItem[]>([])
+  const [courses, setCourses] = useState<CourseItem[]>([])
 
   useEffect(() => {
     getPublicMarketingContentAction()
       .then((res) => {
         setTestimonials(res.testimonials)
         setPromoCards(res.promoCards)
+      })
+      .catch(() => {})
+
+    getPublicCoursesAction()
+      .then((res) => {
+        setCourses(res)
       })
       .catch(() => {})
   }, [])
@@ -41,12 +50,19 @@ export function HomeView() {
               Assessment Model
             </h1>
             <p className="mt-7 max-w-2xl text-base leading-7 text-slate-400 md:text-lg">
-              Learn security and solution architecture through practical exercises, scenario-based
-              quizzes, recorded classes and AI-assisted design reviews.
+              Master enterprise defense-in-depth, zero-trust engineering, and cloud threat modeling
+              through practical video masterclasses, interactive scenario quizzes, and AI-assisted
+              design reviews.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
-              <Link href="/dashboard" className="button-primary">
-                Go to Dashboard <Icon name="arrow" className="size-4" />
+              <Link href="/courses" className="button-primary">
+                Explore Courses <Icon name="arrow" className="size-4" />
+              </Link>
+              <Link href="/courses" className="button-secondary">
+                <span className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Watch Free Demo
+                </span>
               </Link>
               <Link href="/design-review" className="button-secondary">
                 Try a Design Review
@@ -68,6 +84,123 @@ export function HomeView() {
                 </span>
               </Link>
             ))}
+          </div>
+        </section>
+
+        {/* Featured Courses Section with Free Trial Badges */}
+        <section className="relative border-t border-white/8 bg-white/[0.01] py-20">
+          <div className="mx-auto max-w-[1180px] px-5 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div>
+                <p className="eyebrow">Curriculum Highlights</p>
+                <h2 className="mt-3 text-3xl font-bold tracking-tight text-white md:text-4xl">
+                  Featured Architecture Masterclasses
+                </h2>
+                <p className="mt-3 max-w-xl text-sm text-slate-400">
+                  Every course includes a completely free trial lesson. Stream immediately without
+                  entering payment details.
+                </p>
+              </div>
+              <Link href="/courses" className="button-secondary shrink-0">
+                View All Courses ({courses.length}) →
+              </Link>
+            </div>
+
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {courses.slice(0, 3).map((course) => (
+                <div key={course.id} className="card overflow-hidden flex flex-col justify-between">
+                  <div>
+                    <div className="relative aspect-video w-full bg-slate-900 border-b border-white/5 overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent z-10" />
+                      <div className="absolute top-3 left-3 z-20 flex gap-2">
+                        <span className="badge border-emerald-500/40 bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold">
+                          {course.category}
+                        </span>
+                        <span className="badge border-white/10 bg-white/10 text-slate-300 text-[10px]">
+                          {course.level}
+                        </span>
+                      </div>
+                      <div className="absolute bottom-3 left-3 z-20">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 border border-emerald-500/30">
+                          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Free Trial Available
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-6">
+                      <h3 className="text-lg font-bold text-white line-clamp-1">{course.title}</h3>
+                      <p className="mt-2 text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                        {course.description}
+                      </p>
+                      <div className="mt-4 flex items-center justify-between text-xs text-slate-400 border-t border-white/5 pt-3">
+                        <span>⏱️ {course.duration}</span>
+                        <span>📚 {course.lessons.length} lessons</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 pt-0 flex items-center justify-between gap-3">
+                    <span className="text-base font-bold text-white">{course.price}</span>
+                    <Link
+                      href={`/courses/${course.slug}`}
+                      className="button-primary text-xs py-2 px-3"
+                    >
+                      Watch Free Demo
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* How SANGAM Works Section */}
+        <section className="relative border-t border-white/8 py-20">
+          <div className="mx-auto max-w-[1180px] px-5 lg:px-8">
+            <div className="text-center max-w-2xl mx-auto">
+              <p className="eyebrow">The SANGAM Framework</p>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight text-white md:text-4xl">
+                How You Learn &amp; Build
+              </h2>
+              <p className="mt-4 text-sm text-slate-400">
+                A 4-step pedagogical model designed to transform senior engineers into high-assurance
+                security architects.
+              </p>
+            </div>
+
+            <div className="mt-14 grid gap-6 md:grid-cols-4">
+              {[
+                {
+                  step: '01',
+                  title: 'Watch Free Trial',
+                  desc: 'Stream a full masterclass lecture on any topic without entering credit card information.',
+                },
+                {
+                  step: '02',
+                  title: 'Master Architecture Patterns',
+                  desc: 'Dissect zero-trust perimeters, STRIDE threat models, and crypto key hierarchies.',
+                },
+                {
+                  step: '03',
+                  title: 'Solve Scenario Quizzes',
+                  desc: 'Face real-world incident simulations and evaluate subtle architecture vulnerability trade-offs.',
+                },
+                {
+                  step: '04',
+                  title: 'AI Design Review',
+                  desc: 'Submit your architectural blueprints for instant defense completeness analysis.',
+                },
+              ].map((item) => (
+                <div key={item.step} className="card p-6 relative">
+                  <span className="text-3xl font-extrabold text-emerald-400/20 font-mono">
+                    {item.step}
+                  </span>
+                  <h3 className="mt-3 text-base font-bold text-white">{item.title}</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-400">{item.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -175,6 +308,25 @@ export function HomeView() {
                   </Link>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ Preview Banner */}
+        <section className="relative border-t border-white/8 bg-white/[0.01] py-16 text-center">
+          <div className="mx-auto max-w-3xl px-5">
+            <h2 className="text-2xl font-bold text-white">Have questions before joining?</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              Read our answers on free demos, prerequisites, scenario quizzes, and our 7-day
+              money-back guarantee.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-4">
+              <Link href="/faq" className="button-secondary text-xs">
+                Browse All FAQs
+              </Link>
+              <Link href="/refund-policy" className="button-secondary text-xs">
+                Review Refund Policy
+              </Link>
             </div>
           </div>
         </section>

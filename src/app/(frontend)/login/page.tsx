@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@backend/auth/app-auth'
 import { App } from '@frontend/components/App'
@@ -13,5 +14,9 @@ export default async function LoginPage() {
     redirect('/dashboard')
   }
 
-  return <App view="login" />
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading sign in...</div>}>
+      <App view="login" />
+    </Suspense>
+  )
 }

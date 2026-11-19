@@ -18,7 +18,7 @@ export function useAuthForm({ signup = false }: { signup?: boolean } = {}) {
 
   useEffect(() => {
     if (state.ok) {
-      router.push('/dashboard')
+      router.push('/')
     }
   }, [state.ok, router])
 

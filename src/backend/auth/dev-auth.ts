@@ -15,6 +15,7 @@ export type DevUser = {
   role: 'learner'
   termsAcceptedAt: string
   createdAt: string
+  isActive?: boolean
 }
 
 export type DevSessionUser = {
@@ -40,7 +41,7 @@ export function getDevUsers(): DevUser[] {
 
 export function updateDevUser(
   idOrEmail: string,
-  updates: { name?: string }
+  updates: { name?: string; isActive?: boolean }
 ): { ok: boolean; user?: DevSessionUser; message?: string } {
   const users = getDevUsers()
   const normalizedKey = idOrEmail.toLowerCase().trim()
@@ -58,6 +59,10 @@ export function updateDevUser(
       return { ok: false, message: 'Name must be between 2 and 80 characters.' }
     }
     users[userIndex].name = trimmed
+  }
+
+  if (updates.isActive !== undefined) {
+    users[userIndex].isActive = updates.isActive
   }
 
   saveDevUsers(users)
@@ -209,6 +214,10 @@ export function authenticateDevUser(
     return { ok: false, message: 'Incorrect email or password.' }
   }
 
+  if (user.isActive === false) {
+    return { ok: false, message: 'Your account has been deactivated. Please contact support.' }
+  }
+
   return {
     ok: true,
     user: {
@@ -218,6 +227,61 @@ export function authenticateDevUser(
       role: 'learner',
       collection: 'users',
       termsAcceptedAt: user.termsAcceptedAt,
+    },
+  }
+}
+
+/**
+ * Find or create a learner authenticated via Google OAuth (Module 3).
+ */
+export function findOrCreateGoogleDevUser(data: {
+  googleId: string
+  email: string
+  name: string
+}): { ok: boolean; user: DevSessionUser } {
+  const users = getDevUsers()
+  const normalizedEmail = data.email.toLowerCase().trim()
+  let user = users.find((u) => u.email.toLowerCase() === normalizedEmail)
+
+  const now = new Date().toISOString()
+  if (user) {
+    return {
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: 'learner',
+        collection: 'users',
+        termsAcceptedAt: user.termsAcceptedAt,
+      },
+    }
+  }
+
+  const { hash, salt } = hashPassword(crypto.randomBytes(32).toString('hex'))
+  const newUser: DevUser = {
+    id: `usr_g_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    name: data.name.trim() || normalizedEmail.split('@')[0],
+    email: normalizedEmail,
+    hash,
+    salt,
+    role: 'learner',
+    termsAcceptedAt: now,
+    createdAt: now,
+  }
+
+  users.push(newUser)
+  saveDevUsers(users)
+
+  return {
+    ok: true,
+    user: {
+      id: newUser.id,
+      email: newUser.email,
+      name: newUser.name,
+      role: 'learner',
+      collection: 'users',
+      termsAcceptedAt: now,
     },
   }
 }

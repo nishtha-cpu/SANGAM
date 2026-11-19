@@ -266,7 +266,29 @@ async function getAuthoritativeQuiz(quizSlug: string): Promise<AuthoritativeQuiz
     }
   } catch {}
 
-  // 2. Fall back to catalog
+  // 2. Try Local Quizzes Repository (Module 5 & QZ)
+  try {
+    const { getQuizBySlug } = await import('@/backend/repositories/quizzes')
+    const repoMatch = getQuizBySlug(normalizedSlug)
+    if (repoMatch) {
+      return {
+        id: repoMatch.id,
+        title: repoMatch.title,
+        slug: repoMatch.slug,
+        domain: repoMatch.domain,
+        difficulty: repoMatch.difficulty,
+        passingScore: repoMatch.passingScore,
+        questions: repoMatch.questions.map((q) => ({
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation || '',
+        })),
+      }
+    }
+  } catch {}
+
+  // 3. Fall back to catalog
   const catalogMatch = QUIZ_CATALOG[normalizedSlug] || QUIZ_CATALOG[DEFAULT_QUIZ_SLUG]
   return {
     id: `quiz_${catalogMatch.slug}`,

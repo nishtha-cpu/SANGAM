@@ -11,6 +11,7 @@ export type LearnerDirectoryItem = {
   role?: string
   enrolledPackages: string[]
   emailVerified: boolean
+  isActive: boolean
   termsAcceptedAt?: string
   createdAt: string
 }
@@ -39,6 +40,7 @@ export async function getLearnersDirectoryAction(): Promise<LearnerDirectoryItem
         role: u.role || 'learner',
         enrolledPackages: Array.isArray(u.enrolledPackages) ? u.enrolledPackages : [],
         emailVerified: Boolean(u.emailVerified),
+        isActive: u.isActive !== undefined ? Boolean(u.isActive) : true,
         termsAcceptedAt: u.termsAcceptedAt,
         createdAt: u.createdAt,
       }))
@@ -55,6 +57,7 @@ export async function getLearnersDirectoryAction(): Promise<LearnerDirectoryItem
       role: u.role || 'learner',
       enrolledPackages: ['professional'],
       emailVerified: true,
+      isActive: u.isActive !== false,
       termsAcceptedAt: u.termsAcceptedAt,
       createdAt: u.createdAt,
     }))
@@ -161,3 +164,46 @@ export async function revokePackageManuallyAction(
     return { ok: false, message: err.message || 'Failed to revoke package.' }
   }
 }
+
+/**
+ * Server Action: Toggle active status (activation/deactivation) of a learner account (Module 5).
+ */
+export async function toggleLearnerActiveStatusAction(
+  learnerId: string,
+  newActiveState: boolean
+): Promise<{ ok: boolean; message: string; isActive?: boolean }> {
+  const admin = await getAdminUser()
+  if (!admin) {
+    return { ok: false, message: 'Unauthorized: Administrator access required.' }
+  }
+
+  try {
+    const payload = await getPayloadClient()
+    await (payload as any).update({
+      collection: 'users',
+      id: learnerId,
+      data: {
+        isActive: newActiveState,
+      },
+      overrideAccess: true,
+    })
+    return {
+      ok: true,
+      message: `Learner account ${newActiveState ? 'activated' : 'deactivated'} successfully.`,
+      isActive: newActiveState,
+    }
+  } catch {
+    // Local dev store fallback
+    const { updateDevUser } = await import('@/backend/auth/dev-auth')
+    const res = updateDevUser(learnerId, { isActive: newActiveState })
+    if (res.ok) {
+      return {
+        ok: true,
+        message: `Learner account ${newActiveState ? 'activated' : 'deactivated'} successfully.`,
+        isActive: newActiveState,
+      }
+    }
+    return { ok: false, message: res.message || 'Failed to toggle account active status.' }
+  }
+}
+
